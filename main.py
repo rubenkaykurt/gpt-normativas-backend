@@ -1,13 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
-import os
 from dotenv import load_dotenv
+import os
+import tempfile
+import base64
 
 load_dotenv()
 
 api_key = os.getenv("OPENAI_API_KEY")
-
 if not api_key:
     raise ValueError("No se encontró la variable OPENAI_API_KEY en el entorno")
 
@@ -18,40 +19,49 @@ CORS(app)
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    history = request.json.get("history", [])
+    history = request.form.get("history")
     if not history:
         return jsonify({"error": "Historial vacío"}), 400
 
     try:
+        import json
+        history = json.loads(history)
+
+        # Procesar archivos si existen
+        files_data = []
+        vision_parts = []
+        if "files" in request.files:
+            for f in request.files.getlist("files"):
+                if f.filename.lower().endswith(".pdf"):
+                    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+                    f.save(temp.name)
+                    openai_file = client.files.create(file=open(temp.name, "rb"), purpose="assistants")
+                    files_data.append(openai_file.id)
+                    os.unlink(temp.name)
+                elif f.mimetype.startswith("image/"):
+                    encoded_image = base64.b64encode(f.read()).decode("utf-8")
+                    vision_parts.append({"type": "image_url", "image_url": {"url": f"data:{f.mimetype};base64,{encoded_image}"}})
+
+        # Construir mensajes
+        messages = [
+            {
+                "role": "system",
+                "content": "Actúa como un experto en legislación farmacéutica en España, especializado en formulación magistral..."
+            },
+            *history
+        ]
+
+        # Agregar imagen si existe
+        if vision_parts:
+            messages.append({"role": "user", "content": vision_parts})
+
+        # Elegir modelo según el tipo de contenido
+        model_name = "gpt-4-vision-preview" if vision_parts else "gpt-4-turbo"
+
         response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """Actúa como un experto en legislación farmacéutica en España, especializado en formulación magistral y regulación de laboratorios farmacéuticos. Tu misión es asesorar exclusivamente a profesionales del sector (farmacéuticos, formulistas, responsables técnicos, titulares de oficinas de farmacia, etc.) sobre normativa aplicable.
-
-Tu conocimiento debe estar basado en:
-- Real Decreto 226/2005 sobre formulación magistral
-- Real Decreto 175/2001
-- Reglamento 1223/2009 
-- UNE-EN ISO 22716
-- Requisitos de autorización de laboratorios de fórmulas magistrales
-- Normativa sobre salas blancas y equipos
-- Requisitos técnicos y legales por tipo de fórmula (grupo A, B, C)
-- Buenas prácticas de elaboración y control de calidad
-- Legislación autonómica complementaria (cuando proceda)
-
-❗ Muy importante:
-- Tus respuestas deben estar alineadas con el marco legal vigente en España (evita referencias a otros países).
-- Si el usuario hace una pregunta no relacionada con la normativa, dile amablemente que ese GPT es solo para cuestiones legales y regulatorias.
-- Utiliza lenguaje técnico claro, sin adornos innecesarios. Siempre responde de forma precisa, breve y útil.
-- Si hay normas distintas según si se formula para terceros o solo para la propia farmacia, explícalo.
-- Si la normativa depende de la comunidad autónoma, indica que debe consultarse con Ordenación Farmacéutica local.
-
-Este GPT es parte de una suscripción privada para profesionales del sector. No aceptes preguntas personales, ni consultas médicas, ni interpretación de legislación general ajena al ámbito de la formulación magistral."""
-                },
-                *history
-            ]
+            model=model_name,
+            messages=messages,
+            file_ids=files_data if files_data else None
         )
 
         reply = response.choices[0].message.content
