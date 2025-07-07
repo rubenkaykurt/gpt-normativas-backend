@@ -70,7 +70,8 @@ def chat():
         print("Error:", str(e))
         return jsonify({"error": str(e)}), 500
 
-# 🔽 Estas funciones deben estar FUERA del bloque `chat()`
+# ✅ Ahora las funciones auxiliares bien definidas
+
 def extract_text_from_pdf(pdf_bytes):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
