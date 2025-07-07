@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Normativas</title>
+</head>
+<body>
+    <textarea id="message" placeholder="Escribe tu pregunta..."></textarea>
+    <button onclick="enviar()">Enviar</button>
+    <pre id="respuesta"></pre>
+
+    <script>
+        async function enviar() {
+            const mensaje = document.getElementById("message").value;
+            const respuesta = document.getElementById("respuesta");
+            respuesta.textContent = "Cargando...";
+
+            try {
+                const res = await fetch("http://localhost:5000/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ message: mensaje })
+                });
+
+                const data = await res.json();
+                respuesta.textContent = data.reply || data.error;
+            } catch (error) {
+                respuesta.textContent = "Error de conexión: " + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
