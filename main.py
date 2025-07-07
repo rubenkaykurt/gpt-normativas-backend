@@ -1,9 +1,13 @@
+import json
+import fitz  # PyMuPDF
+import pytesseract
+from PIL import Image
+import io
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
-import base64
 
 load_dotenv()
 
@@ -17,27 +21,8 @@ app = Flask(__name__)
 CORS(app)
 
 SYSTEM_PROMPT = """
-Actúa como un experto en legislación farmacéutica en España, especializado en formulación magistral y regulación de laboratorios farmacéuticos. Tu misión es asesorar exclusivamente a profesionales del sector (farmacéuticos, formulistas, responsables técnicos, titulares de oficinas de farmacia, etc.) sobre normativa aplicable.
-
-Tu conocimiento debe estar basado en:
-- Real Decreto 226/2005 sobre formulación magistral
-- Real Decreto 175/2001
-- Reglamento 1223/2009 
-- UNE-EN ISO 22716
-- Requisitos de autorización de laboratorios de fórmulas magistrales
-- Normativa sobre salas blancas y equipos
-- Requisitos técnicos y legales por tipo de fórmula (grupo A, B, C)
-- Buenas prácticas de elaboración y control de calidad
-- Legislación autonómica complementaria (cuando proceda)
-
-❗ Muy importante:
-- Tus respuestas deben estar alineadas con el marco legal vigente en España (evita referencias a otros países).
-- Si el usuario hace una pregunta no relacionada con la normativa, dile amablemente que este GPT es solo para cuestiones legales y regulatorias.
-- Utiliza lenguaje técnico claro, sin adornos innecesarios. Siempre responde de forma precisa, breve y útil.
-- Si hay normas distintas según si se formula para terceros o solo para la propia farmacia, explícalo.
-- Si la normativa depende de la comunidad autónoma, indica que debe consultarse con Ordenación Farmacéutica local.
-
-Este GPT es parte de una suscripción privada para profesionales del sector. No aceptes preguntas personales, ni consultas médicas, ni interpretación de legislación general ajena al ámbito de la formulación magistral.
+Actúa como un experto en legislación farmacéutica en España...
+(TODO EL PROMPT IGUAL QUE YA TENÍAS)
 """
 
 @app.route("/chat", methods=["POST"])
@@ -49,14 +34,12 @@ def chat():
 
         history = json.loads(history_json)
 
-        # Procesar archivo (si lo hay)
         uploaded_file = request.files.get("file")
         file_info = None
         if uploaded_file:
             filename = uploaded_file.filename
             content = uploaded_file.read()
 
-            # Procesar según tipo
             if filename.endswith(".pdf"):
                 file_info = extract_text_from_pdf(content)
             elif filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
@@ -64,12 +47,8 @@ def chat():
             else:
                 return jsonify({"error": "Tipo de archivo no soportado"}), 400
 
-        # Construir mensaje para OpenAI
         messages = [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT
-            },
+            {"role": "system", "content": SYSTEM_PROMPT},
             *history
         ]
 
@@ -91,6 +70,24 @@ def chat():
         print("Error:", str(e))
         return jsonify({"error": str(e)}), 500
 
+# 🔽 Estas funciones deben estar FUERA del bloque `chat()`
+def extract_text_from_pdf(pdf_bytes):
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        text = ""
+        for page in doc:
+            text += page.get_text()
+        return text.strip() or "No se pudo extraer texto del PDF."
+    except Exception as e:
+        return f"[ERROR al leer PDF: {str(e)}]"
+
+def extract_text_from_image(image_bytes):
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        text = pytesseract.image_to_string(image, lang='spa+eng')
+        return text.strip() or "No se detectó texto en la imagen."
+    except Exception as e:
+        return f"[ERROR al procesar imagen: {str(e)}]"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
