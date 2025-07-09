@@ -113,6 +113,23 @@ def get_history(user_id):
                 })
     historial.sort(key=lambda x: x["timestamp"], reverse=True)
     return jsonify(historial)
+async function guardarHistorial() {
+  if (!currentUserId || messageHistory.length < 2) return; // al menos debe haber 1 pregunta + respuesta
+
+  try {
+    await fetch("https://gpt-normativas-backend.onrender.com/guardar_historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: currentUserId,
+        history: messageHistory
+      })
+    });
+    console.log("✅ Historial guardado automáticamente");
+  } catch (err) {
+    console.error("❌ Error al guardar historial:", err);
+  }
+}
 
 
 # ======== INICIAR FLASK ========
