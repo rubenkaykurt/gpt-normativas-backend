@@ -75,7 +75,7 @@ def extract_text_from_image(file_storage):
 @app.route("/save-conversation", methods=["POST"])
 def save_conversation():
     data = request.json
-    user_id = data.get("user_id")
+    user_id = data.get("user_id") or "demo"
     title = data.get("title", "Sin título")
     messages = data.get("messages")
     timestamp = data.get("timestamp")
