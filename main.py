@@ -113,24 +113,34 @@ def get_history(user_id):
                 })
     historial.sort(key=lambda x: x["timestamp"], reverse=True)
     return jsonify(historial)
-async function guardarHistorial() {
-  if (!currentUserId || messageHistory.length < 2) return; // al menos debe haber 1 pregunta + respuesta
 
-  try {
-    await fetch("https://gpt-normativas-backend.onrender.com/guardar_historial", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: currentUserId,
-        history: messageHistory
-      })
-    });
-    console.log("✅ Historial guardado automáticamente");
-  } catch (err) {
-    console.error("❌ Error al guardar historial:", err);
-  }
-}
+from datetime import datetime
 
+@app.route("/guardar_historial", methods=["POST"])
+def guardar_historial():
+    data = request.json
+    user_id = data.get("user_id")
+    messages = data.get("history")
+
+    if not user_id or not messages:
+        return jsonify({"status": "error", "message": "Faltan datos"}), 400
+
+    # Crear título automático con los primeros 6-8 palabras
+    titulo = messages[1]["content"][:40] + "..." if len(messages) > 1 else "Sin título"
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"{user_id}_{timestamp}.json"
+    filepath = os.path.join("historial", filename)
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump({
+            "user_id": user_id,
+            "title": titulo,
+            "timestamp": timestamp,
+            "messages": messages
+        }, f, ensure_ascii=False, indent=2)
+
+    return jsonify({"status": "ok", "filename": filename})
 
 # ======== INICIAR FLASK ========
 if __name__ == "__main__":
