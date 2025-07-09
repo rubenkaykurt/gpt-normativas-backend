@@ -118,12 +118,34 @@ from datetime import datetime
 
 @app.route("/guardar_historial", methods=["POST"])
 def guardar_historial():
-    data = request.json
+    try:
+        data = request.get_json(force=True)
+    except Exception as e:
+        return jsonify({"status": "error", "message": "JSON inválido", "detail": str(e)}), 400
+
     user_id = data.get("user_id")
-    messages = data.get("history")
+    title = data.get("title", "Sin título")
+    messages = data.get("messages")
+    timestamp = data.get("timestamp")
 
     if not user_id or not messages:
         return jsonify({"status": "error", "message": "Faltan datos"}), 400
+
+    # Guardado
+    safe_timestamp = timestamp.replace(":", "-").replace(" ", "_")
+    filename = f"{user_id}_{safe_timestamp}.json"
+    filepath = os.path.join("historial", filename)
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump({
+            "user_id": user_id,
+            "title": title,
+            "timestamp": timestamp,
+            "messages": messages
+        }, f, ensure_ascii=False, indent=2)
+
+    return jsonify({"status": "ok"})
+
 
     # Crear título automático con los primeros 6-8 palabras
     titulo = messages[1]["content"][:40] + "..." if len(messages) > 1 else "Sin título"
