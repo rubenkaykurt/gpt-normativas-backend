@@ -115,6 +115,11 @@ def get_history(user_id):
     return jsonify(historial)
 
 from datetime import datetime
+print("📥 Recibido historial:")
+print(json.dumps(historial, indent=2, ensure_ascii=False))
+
+print(f"🔧 Ruta esperada: {carpeta_usuario}")
+print(f"📄 Archivo: {os.path.join(carpeta_usuario, f'{titulo_archivo}.json')}")
 
 @app.route("/guardar_historial", methods=["POST"])
 def guardar_historial():
@@ -127,8 +132,11 @@ def guardar_historial():
     if not user_id or not title or not timestamp or not messages:
         return jsonify({"status": "error", "message": "Faltan datos"}), 400
 
-    folder_path = os.path.join("conversaciones", user_id)
+    folder_path = os.path.join("historial", user_id)
     os.makedirs(folder_path, exist_ok=True)
+    filepath = os.path.join(folder_path, f"{timestamp}_{title}.json")
+print(f"💾 Guardando historial en: {filepath}")
+
 
     # Aseguramos nombre de archivo válido
     title = "".join(c for c in title if c.isalnum() or c in (" ", "_")).rstrip().replace(" ", "_")
