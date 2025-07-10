@@ -135,7 +135,7 @@ def guardar_historial():
     folder_path = os.path.join("historial", user_id)
     os.makedirs(folder_path, exist_ok=True)
     filepath = os.path.join(folder_path, f"{timestamp}_{title}.json")
-print(f"💾 Guardando historial en: {filepath}")
+    print(f"💾 Guardando historial en: {filepath}")
 
 
     # Aseguramos nombre de archivo válido
