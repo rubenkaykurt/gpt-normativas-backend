@@ -124,6 +124,7 @@ print(f"📄 Archivo: {os.path.join(carpeta_usuario, f'{titulo_archivo}.json')}"
 @app.route("/guardar_historial", methods=["POST"])
 def guardar_historial():
     data = request.json
+    print(json.dumps(data, indent=2, ensure_ascii=False))
     user_id = data.get("user_id")
     title = data.get("title")
     timestamp = data.get("timestamp")
