@@ -71,21 +71,25 @@ def extract_text_from_image(file_storage):
     return pytesseract.image_to_string(image).strip()
 
 
-# ======== ENDPOINT PARA GUARDAR UNA CONVERSACIÓN ========
 @app.route("/save-conversation", methods=["POST"])
 def save_conversation():
     data = request.json
     user_id = data.get("user_id") or "demo"
     title = data.get("title", "Sin título")
     messages = data.get("messages")
-    timestamp = data.get("timestamp")
+    timestamp = data.get("timestamp") or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     if not user_id or not messages:
         return jsonify({"status": "error", "message": "Faltan datos"}), 400
 
-    safe_timestamp = timestamp.replace(":", "-").replace(" ", "_")
-    filename = f"{user_id}_{safe_timestamp}.json"
-    filepath = os.path.join("historial", filename)
+    folder_path = os.path.join("historial", user_id)
+    os.makedirs(folder_path, exist_ok=True)
+
+    safe_title = "".join(c for c in title if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")
+    filename = f"{timestamp}_{safe_title}.json"
+    filepath = os.path.join(folder_path, filename)
+
+    print(f"💾 Guardando historial en: {filepath}")
 
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump({
@@ -98,60 +102,29 @@ def save_conversation():
     return jsonify({"status": "ok"})
 
 
-# ======== ENDPOINT PARA CARGAR EL HISTORIAL DEL USUARIO ========
+# ======== CARGAR HISTORIAL DE USUARIO ========
 @app.route("/get-history/<user_id>", methods=["GET"])
 def get_history(user_id):
     historial = []
-    for file in os.listdir("historial"):
-        if file.startswith(user_id):
-            with open(os.path.join("historial", file), "r", encoding="utf-8") as f:
+    folder_path = os.path.join("historial", user_id)
+    if not os.path.exists(folder_path):
+        return jsonify([])
+
+    for file in os.listdir(folder_path):
+        if file.endswith(".json"):
+            with open(os.path.join(folder_path, file), "r", encoding="utf-8") as f:
                 data = json.load(f)
                 historial.append({
                     "title": data.get("title", "Sin título"),
                     "timestamp": data.get("timestamp"),
                     "messages": data.get("messages")
                 })
+
     historial.sort(key=lambda x: x["timestamp"], reverse=True)
     return jsonify(historial)
 
-from datetime import datetime
-print("📥 Recibido historial:")
-print(json.dumps(historial, indent=2, ensure_ascii=False))
 
-print(f"🔧 Ruta esperada: {carpeta_usuario}")
-print(f"📄 Archivo: {os.path.join(carpeta_usuario, f'{titulo_archivo}.json')}")
-
-@app.route("/guardar_historial", methods=["POST"])
-def guardar_historial():
-    data = request.json
-    print(json.dumps(data, indent=2, ensure_ascii=False))
-    user_id = data.get("user_id")
-    title = data.get("title")
-    timestamp = data.get("timestamp")
-    messages = data.get("messages")
-
-    if not user_id or not title or not timestamp or not messages:
-        return jsonify({"status": "error", "message": "Faltan datos"}), 400
-
-    folder_path = os.path.join("historial", user_id)
-    os.makedirs(folder_path, exist_ok=True)
-    filepath = os.path.join(folder_path, f"{timestamp}_{title}.json")
-    print(f"💾 Guardando historial en: {filepath}")
-
-
-    # Aseguramos nombre de archivo válido
-    title = "".join(c for c in title if c.isalnum() or c in (" ", "_")).rstrip().replace(" ", "_")
-    filepath = os.path.join(folder_path, f"{timestamp}_{title}.json")
-    
-    print(f"💾 Guardando historial en: {filepath}")  # <- Este print te ayudará
-
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(messages, f, ensure_ascii=False, indent=2)
-
-    return jsonify({"status": "ok"})
-
-
-# ======== INICIAR FLASK ========
+# ======== INICIAR FLASK APP ========
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
